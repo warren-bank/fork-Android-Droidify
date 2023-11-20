@@ -13,6 +13,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.engine.okhttp.OkHttpConfig
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.network.sockets.SocketTimeoutException
+import io.ktor.client.plugins.HttpRedirect
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.onDownload
 import io.ktor.client.request.head
@@ -39,14 +40,21 @@ import kotlinx.coroutines.withContext
 
 internal class KtorDownloader : Downloader {
 
-    private var client = HttpClient(OkHttp) { timeoutConfig() }
-        set(newClient) {
-            field.close()
-            field = newClient
-        }
+    private var client = HttpClient(OkHttp) {
+        followRedirects = true
+        redirectConfig()
+        timeoutConfig()
+    }
+
+    set(newClient) {
+        field.close()
+        field = newClient
+    }
 
     override fun setProxy(proxy: Proxy) {
         client = HttpClient(OkHttp) {
+            followRedirects = true
+            redirectConfig()
             timeoutConfig()
             engine { this.proxy = proxy }
         }
@@ -101,6 +109,11 @@ internal class KtorDownloader : Downloader {
     }
 
     companion object {
+
+        private fun HttpClientConfig<OkHttpConfig>.redirectConfig() = install(HttpRedirect) {
+            allowHttpsDowngrade = true
+            checkHttpMethod = false
+        }
 
         private fun HttpClientConfig<OkHttpConfig>.timeoutConfig() = install(HttpTimeout) {
             connectTimeoutMillis = 30_000
